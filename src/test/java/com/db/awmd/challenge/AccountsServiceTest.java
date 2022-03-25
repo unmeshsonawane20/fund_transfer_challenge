@@ -1,0 +1,99 @@
+package com.db.awmd.challenge;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.fail;
+
+import com.db.awmd.challenge.domain.Account;
+import com.db.awmd.challenge.dto.TransferFundRequestDto;
+import com.db.awmd.challenge.dto.TransferFundResponseDto;
+import com.db.awmd.challenge.exception.BadRequestException;
+import com.db.awmd.challenge.exception.DuplicateAccountIdException;
+import com.db.awmd.challenge.exception.InsufficientFundException;
+import com.db.awmd.challenge.service.AccountsService;
+import java.math.BigDecimal;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.junit4.SpringRunner;
+
+@RunWith(SpringRunner.class)
+@SpringBootTest
+public class AccountsServiceTest {
+
+  @Autowired
+  private AccountsService accountsService;
+
+  @Test
+  public void addAccount() throws Exception {
+    Account account = new Account("Id-123");
+    account.setBalance(new BigDecimal(1000));
+    this.accountsService.createAccount(account);
+
+    assertThat(this.accountsService.getAccount("Id-123")).isEqualTo(account);
+  }
+
+  @Test
+  public void addAccount_failsOnDuplicateId() throws Exception {
+    String uniqueId = "Id-" + System.currentTimeMillis();
+    Account account = new Account(uniqueId);
+    this.accountsService.createAccount(account);
+
+    try {
+      this.accountsService.createAccount(account);
+      fail("Should have failed when adding duplicate account");
+    } catch (DuplicateAccountIdException ex) {
+      assertThat(ex.getMessage()).isEqualTo("Account id " + uniqueId + " already exists!");
+    }
+
+  }
+  
+  @Test
+  public void transferFund_shouldSuccess() throws Exception {
+	  	String testAccount1 = "TestAccount1";
+	  	String testAccount2 = "TestAccount2";
+	  	createTestAccount(testAccount1,"100");
+	  	createTestAccount(testAccount2,"50");
+	  	TransferFundRequestDto request = new TransferFundRequestDto();
+	  	request.setFromAccountNumber(testAccount1);
+	  	request.setToAccountNumber(testAccount2);
+	  	request.setAmount(new BigDecimal(50));
+	  	TransferFundResponseDto resp = this.accountsService.transferFund(request);
+	  	assertThat(resp.getBalance()).isEqualTo(new BigDecimal(50));
+  }
+  
+  @Test(expected = InsufficientFundException.class)
+  public void transferFund_shouldFailedWithInsufficientBalance() throws Exception {
+	  	String testAccount1 = "TestAccount1";
+	  	String testAccount2 = "TestAccount2";
+	  	createTestAccount(testAccount1,"50");
+	  	createTestAccount(testAccount2,"100");
+	  	TransferFundRequestDto request = new TransferFundRequestDto();
+	  	request.setFromAccountNumber(testAccount1);
+	  	request.setToAccountNumber(testAccount2);
+	  	request.setAmount(new BigDecimal(100));
+	  	this.accountsService.transferFund(request);	  	
+  }
+  
+  @Test(expected = BadRequestException.class)
+  public void transferFund_negativeFundTransfer_shouldFailedWithBadRequest() throws Exception {
+	  	String testAccount1 = "TestAccount1";
+	  	String testAccount2 = "TestAccount2";
+	  	createTestAccount(testAccount1,"50");
+	  	createTestAccount(testAccount2,"100");
+	  	TransferFundRequestDto request = new TransferFundRequestDto();
+	  	request.setFromAccountNumber(testAccount1);
+	  	request.setToAccountNumber(testAccount2);
+	  	request.setAmount(new BigDecimal(0));
+	  	this.accountsService.transferFund(request);	  	
+  }
+  
+  public void createTestAccount(String accountId, String balance) throws Exception {
+	    String uniqueAccountId = accountId;
+	    Account account = new Account(uniqueAccountId, new BigDecimal(balance));
+	     this.accountsService.createAccount(account);
+	  }
+  
+  
+  
+}
